@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RepoOrbit - AI Repository Maintenance Cockpit</title>
+  <meta name="description" content="RepoOrbit is an AI-powered repository maintenance cockpit for codebase understanding, task planning, patch generation, testing and PR review." />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg-soft: #111a33;
+      --panel: rgba(255, 255, 255, 0.075);
+      --panel-strong: rgba(255, 255, 255, 0.11);
+      --border: rgba(255, 255, 255, 0.14);
+      --text: #eef4ff;
+      --muted: #aab8d5;
+      --subtle: #7f8cad;
+      --accent: #7c5cff;
+      --accent-2: #2ee9a6;
+      --accent-3: #57b9ff;
+      --warning: #ffd166;
+      --danger: #ff6b8a;
+      --ok: #4ee6a6;
+      --shadow: 0 28px 80px rgba(0,0,0,.42);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 10%, rgba(124,92,255,.45), transparent 30%),
+        radial-gradient(circle at 82% 8%, rgba(87,185,255,.38), transparent 26%),
+        radial-gradient(circle at 78% 74%, rgba(46,233,166,.18), transparent 34%),
+        linear-gradient(180deg, #081020 0%, #0c1226 44%, #080b15 100%);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body:before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.85), transparent 78%);
+    }
+
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(18px);
+      background: rgba(8, 13, 27, .72);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 780; letter-spacing: -.02em; }
+    .logo {
+      width: 38px; height: 38px; border-radius: 13px;
+      background: conic-gradient(from 210deg, var(--accent), var(--accent-3), var(--accent-2), var(--accent));
+      box-shadow: 0 14px 34px rgba(124,92,255,.38);
+      position: relative;
+    }
+    .logo:after { content: ""; position: absolute; inset: 9px; border-radius: 9px; background: rgba(7,12,25,.7); border: 1px solid rgba(255,255,255,.2); }
+    .brand span { font-size: 18px; }
+    .nav-links { display: flex; gap: 18px; align-items: center; font-size: 14px; color: var(--muted); }
+    .nav-links a:hover { color: #fff; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.07);
+      color: #dbe8ff;
+      border-radius: 999px;
+      padding: 9px 13px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; background: var(--accent-2); box-shadow: 0 0 18px var(--accent-2); }
+
+    .hero { padding: 86px 0 58px; position: relative; }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.02fr .98fr;
+      gap: 36px;
+      align-items: center;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid rgba(124,92,255,.34);
+      background: rgba(124,92,255,.14);
+      color: #ddd6ff;
+      border-radius: 999px;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: clamp(42px, 5.2vw, 76px);
+      line-height: .96;
+      letter-spacing: -.065em;
+      margin: 0 0 24px;
+    }
+    .gradient-text {
+      background: linear-gradient(90deg, #fff, #cdd8ff 32%, #7ae6c3 74%, #8ac9ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.8;
+      max-width: 650px;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; }
+    .btn {
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-size: 15px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+      font-weight: 720;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: linear-gradient(135deg, #7c5cff, #57b9ff); color: white; box-shadow: 0 18px 42px rgba(87,185,255,.22); }
+    .btn-secondary { background: rgba(255,255,255,.08); border: 1px solid var(--border); color: var(--text); }
+
+    .orbital-card {
+      position: relative;
+      border-radius: var(--radius-xl);
+      background: linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.06));
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      overflow: hidden;
+    }
+    .orbital-card:before {
+      content: "";
+      position: absolute;
+      inset: -120px -90px auto auto;
+      width: 240px; height: 240px;
+      background: radial-gradient(circle, rgba(87,185,255,.5), transparent 68%);
+      filter: blur(10px);
+    }
+    .browser-top {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      margin: -2px -2px 18px;
+      padding: 0 8px 14px;
+      color: var(--subtle);
+      font-size: 12px;
+    }
+    .circle { width: 11px; height: 11px; border-radius: 50%; background: rgba(255,255,255,.28); }
+    .circle:nth-child(1) { background: #ff6b8a; }
+    .circle:nth-child(2) { background: #ffd166; }
+    .circle:nth-child(3) { background: #4ee6a6; }
+    .browser-url { margin-left: 8px; padding: 8px 12px; border-radius: 999px; background: rgba(0,0,0,.2); flex: 1; color: #b9c7e8; font-family: var(--mono); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+    .terminal-grid { display: grid; gap: 14px; }
+    .repo-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .repo-title h3 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+    .repo-title small { color: var(--subtle); font-family: var(--mono); }
+    .health-ring {
+      width: 82px; height: 82px; border-radius: 50%;
+      display: grid; place-items: center;
+      background: conic-gradient(var(--accent-2) 0 72%, rgba(255,255,255,.12) 72% 100%);
+      position: relative;
+      flex: none;
+    }
+    .health-ring:after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: #121a30; }
+    .health-ring strong { position: relative; z-index: 1; font-size: 20px; }
+    .mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .mini-stat {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      border-radius: 16px;
+      padding: 14px;
+    }
+    .mini-stat strong { display: block; font-size: 22px; margin-bottom: 4px; }
+    .mini-stat span { color: var(--subtle); font-size: 12px; }
+    .code-window {
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(3,7,16,.68);
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+      color: #c6d5f7;
+      overflow: hidden;
+    }
+    .line-add { color: #78f2b7; }
+    .line-del { color: #ff8aa1; }
+    .line-info { color: #83c8ff; }
+
+    section { padding: 56px 0; }
+    .section-head { display: flex; justify-content: space-between; align-items: end; gap: 22px; margin-bottom: 24px; }
+    .section-head h2 { margin: 0; font-size: clamp(28px, 3vw, 44px); letter-spacing: -.045em; }
+    .section-head p { margin: 10px 0 0; color: var(--muted); line-height: 1.65; max-width: 720px; }
+    .kicker { color: var(--accent-2); font-family: var(--mono); font-size: 13px; text-transform: uppercase; letter-spacing: .12em; }
+
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card {
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.045));
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      box-shadow: 0 18px 52px rgba(0,0,0,.18);
+    }
+    .card h3 { margin: 0 0 10px; font-size: 18px; letter-spacing: -.02em; }
+    .card p { margin: 0; color: var(--muted); line-height: 1.7; font-size: 14px; }
+    .icon {
+      width: 42px; height: 42px; border-radius: 14px; margin-bottom: 16px;
+      display: grid; place-items: center;
+      background: rgba(124,92,255,.16);
+      border: 1px solid rgba(124,92,255,.3);
+      color: #dcd6ff;
+      font-weight: 900;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 270px 1fr;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      background: rgba(255,255,255,.06);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      min-height: 680px;
+    }
+    .sidebar { border-right: 1px solid var(--border); background: rgba(5,9,20,.42); padding: 18px; }
+    .sidebar-title { color: var(--subtle); font-size: 12px; text-transform: uppercase; letter-spacing: .14em; margin: 8px 0 12px; }
+    .repo-picker {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 18px;
+    }
+    .repo-picker strong { display:block; margin-bottom: 4px; }
+    .repo-picker span { color: var(--subtle); font-family: var(--mono); font-size: 11px; }
+    .side-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 10px;
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+    .side-item.active, .side-item:hover { background: rgba(124,92,255,.16); color: #fff; }
+    .main-panel { padding: 22px; }
+    .panel-top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom: 18px; }
+    .panel-title h3 { margin:0; font-size: 24px; letter-spacing:-.03em; }
+    .panel-title p { color: var(--muted); margin:6px 0 0; font-size: 14px; }
+    .status-badge { display:inline-flex; align-items:center; gap:8px; padding:10px 12px; border-radius:999px; background:rgba(46,233,166,.12); border:1px solid rgba(46,233,166,.28); color:#b9ffe6; font-size:13px; }
+
+    .metric-row { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    .metric {
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.055);
+      border-radius:18px;
+      padding:16px;
+    }
+    .metric span { color:var(--subtle); font-size:12px; display:block; margin-bottom:7px; }
+    .metric strong { font-size:24px; }
+    .metric em { font-style:normal; color:var(--accent-2); font-size:12px; margin-left:5px; }
+
+    .split { display:grid; grid-template-columns: 1.04fr .96fr; gap: 14px; }
+    .panel-box {
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.05);
+      border-radius:20px;
+      padding:18px;
+    }
+    .panel-box h4 { margin:0 0 14px; font-size:15px; letter-spacing:-.01em; }
+    .table { width:100%; border-collapse:collapse; font-size:13px; }
+    .table th { color:var(--subtle); font-weight:600; text-align:left; padding: 0 0 10px; border-bottom:1px solid var(--border); }
+    .table td { padding:12px 0; border-bottom:1px solid rgba(255,255,255,.08); color:#d6e3ff; }
+    .table tr:last-child td { border-bottom:0; }
+    .risk-high { color: var(--danger); }
+    .risk-mid { color: var(--warning); }
+    .risk-low { color: var(--ok); }
+
+    .module-map { display:grid; gap:10px; }
+    .module {
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:12px;
+      border:1px solid rgba(255,255,255,.1);
+      border-radius:14px;
+      background:rgba(0,0,0,.18);
+    }
+    .module b { font-family:var(--mono); font-size:12px; }
+    .bar { height: 7px; border-radius: 999px; background:rgba(255,255,255,.11); overflow:hidden; min-width:86px; }
+    .bar i { display:block; height:100%; border-radius:999px; background:linear-gradient(90deg, var(--accent), var(--accent-3)); }
+
+    .timeline { display:grid; gap:14px; }
+    .step {
+      display:grid;
+      grid-template-columns: 34px 1fr auto;
+      gap: 14px;
+      align-items: start;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.055);
+      padding:16px;
+      border-radius:18px;
+    }
+    .step-num { width:34px; height:34px; border-radius:12px; display:grid; place-items:center; background:rgba(124,92,255,.2); border:1px solid rgba(124,92,255,.35); color:#e7e1ff; font-weight:800; }
+    .step h4 { margin:0 0 6px; font-size:15px; }
+    .step p { margin:0; color:var(--muted); font-size:13px; line-height:1.55; }
+    .step small { color:var(--subtle); font-family:var(--mono); white-space:nowrap; }
+
+    .diff-layout { display:grid; grid-template-columns: 1fr 340px; gap:14px; }
+    .diff-file {
+      border:1px solid var(--border);
+      border-radius:20px;
+      overflow:hidden;
+      background:rgba(3,7,16,.68);
+    }
+    .diff-head { padding:12px 14px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; color:#cfe0ff; font-family:var(--mono); font-size:12px; background:rgba(255,255,255,.04); }
+    pre { margin:0; padding:16px; overflow:auto; font-family:var(--mono); font-size:12px; line-height:1.68; color:#d4e2ff; }
+    .review-card { border:1px solid var(--border); background:rgba(255,255,255,.055); border-radius:20px; padding:18px; margin-bottom:14px; }
+    .review-card h4 { margin:0 0 8px; }
+    .review-card p { margin:0; color:var(--muted); font-size:13px; line-height:1.7; }
+    .checklist { display:grid; gap:10px; margin-top:12px; }
+    .check { display:flex; gap:10px; align-items:flex-start; color:#dce7ff; font-size:13px; }
+    .check:before { content:"✓"; color:var(--ok); font-weight:900; }
+
+    .benchmark { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px; }
+    .score-card { border:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,.085), rgba(255,255,255,.045)); border-radius:22px; padding:20px; }
+    .score-card strong { font-size:36px; letter-spacing:-.04em; }
+    .score-card span { color:var(--muted); display:block; margin-top:8px; line-height:1.55; font-size:14px; }
+    .spark { height: 78px; margin-top:18px; border-radius:14px; background:linear-gradient(180deg, rgba(87,185,255,.18), transparent), repeating-linear-gradient(90deg, transparent 0 22px, rgba(255,255,255,.05) 22px 23px); position:relative; overflow:hidden; }
+    .spark svg { position:absolute; inset:0; width:100%; height:100%; }
+
+    .roadmap { display:grid; grid-template-columns: repeat(4, 1fr); gap:14px; }
+    .roadmap .card { min-height: 190px; }
+    .tag { display:inline-flex; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); border-radius:999px; padding:6px 9px; font-size:12px; color:var(--muted); margin-bottom:12px; }
+
+    footer { padding:50px 0 70px; color:var(--subtle); border-top:1px solid var(--border); margin-top:30px; }
+    .footer-inner { display:flex; justify-content:space-between; gap:20px; align-items:center; }
+
+    .floating-note {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 50;
+      border: 1px solid rgba(46,233,166,.28);
+      background: rgba(9, 18, 34, .78);
+      backdrop-filter: blur(14px);
+      border-radius: 16px;
+      padding: 12px 14px;
+      color: #dfffee;
+      font-size: 13px;
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      box-shadow: 0 18px 48px rgba(0,0,0,.32);
+    }
+
+    @media (max-width: 980px) {
+      .hero-grid, .workspace, .split, .diff-layout { grid-template-columns: 1fr; }
+      .cards, .benchmark, .roadmap { grid-template-columns: 1fr 1fr; }
+      .metric-row { grid-template-columns: 1fr 1fr; }
+      .nav-links { display:none; }
+      .sidebar { border-right:0; border-bottom:1px solid var(--border); }
+    }
+    @media (max-width: 640px) {
+      .container { width: min(100% - 26px, 1180px); }
+      .hero { padding-top: 52px; }
+      .cards, .benchmark, .roadmap, .metric-row, .mini-stats { grid-template-columns: 1fr; }
+      .section-head, .footer-inner { flex-direction: column; align-items: start; }
+      .floating-note { left: 13px; right: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a class="brand" href="#top" aria-label="RepoOrbit home"><span class="logo" aria-hidden="true"></span><span>RepoOrbit</span></a>
+      <div class="nav-links">
+        <a href="#product">产品能力</a>
+        <a href="#workspace">演示工作台</a>
+        <a href="#timeline">Agent 流程</a>
+        <a href="#review">PR Review</a>
+        <a href="#benchmark">评测数据</a>
+      </div>
+      <a class="pill" href="#workspace"><span class="dot"></span> Live demo workspace</a>
+    </div>
+  </nav>
+
+  <main id="top">
+    <header class="hero">
+      <div class="container hero-grid">
+        <div>
+          <div class="eyebrow"><span class="dot"></span> AI Repository Maintenance Cockpit</div>
+          <h1>让 AI 真正接管<br><span class="gradient-text">仓库级维护闭环</span></h1>
+          <p>RepoOrbit 面向中大型代码仓库，把代码理解、任务拆解、补丁生成、测试修复、代码审查和 PR 报告串成一条可复盘的 Agent 工作流。它不是聊天窗口，而是开发者处理历史项目、技术债和复杂迁移任务的驾驶舱。</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#workspace">查看演示工作台 →</a>
+            <a class="btn btn-secondary" href="#timeline">浏览 Agent 执行链路</a>
+          </div>
+        </div>
+        <div class="orbital-card" aria-label="RepoOrbit dashboard preview">
+          <div class="browser-top"><span class="circle"></span><span class="circle"></span><span class="circle"></span><span class="browser-url">repoorbit.dev/workspace/northstar-dashboard</span></div>
+          <div class="terminal-grid">
+            <div class="repo-header">
+              <div class="repo-title">
+                <h3>northstar-dashboard</h3>
+                <small>React · Node service · 184 files · 42 tests</small>
+              </div>
+              <div class="health-ring"><strong>72</strong></div>
+            </div>
+            <div class="mini-stats">
+              <div class="mini-stat"><strong>18</strong><span>技术债任务</span></div>
+              <div class="mini-stat"><strong>6</strong><span>高风险文件</span></div>
+              <div class="mini-stat"><strong>41%</strong><span>测试覆盖率</span></div>
+            </div>
+            <div class="code-window">
+              <div class="line-info">Architect Agent detected circular imports in /src/modules/reporting</div>
+              <div class="line-del">- reports/useLegacyFilters.ts  depends on UI state directly</div>
+              <div class="line-add">+ proposed: extract query schema and isolate filter serializer</div>
+              <div class="line-info">Tester Agent queued 12 regression cases for export + date range flows</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section id="product">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <div class="kicker">Core capability</div>
+            <h2>从“问代码”升级到“维护仓库”</h2>
+            <p>RepoOrbit 的目标是让 AI 处理真实工程任务，而不只是生成单个函数。每次运行都会产出结构化仓库报告、任务计划、补丁记录、测试结论和审查意见。</p>
+          </div>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <div class="icon">01</div>
+            <h3>Repository Intelligence</h3>
+            <p>自动读取目录、依赖、路由、状态管理、接口层和测试日志，生成模块地图、风险文件、边界关系和技术债列表。</p>
+          </article>
+          <article class="card">
+            <div class="icon">02</div>
+            <h3>Agent Task Planner</h3>
+            <p>把“升级依赖”“拆分组件”“补测试”“修复 bug”等目标拆成可执行任务，附影响范围、验收标准和回滚方案。</p>
+          </article>
+          <article class="card">
+            <div class="icon">03</div>
+            <h3>Patch & Test Loop</h3>
+            <p>生成代码补丁并根据 lint、typecheck、unit test、e2e test 的输出进行多轮修复，直到形成可审查的 PR 结果。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="workspace">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <div class="kicker">Interactive workspace</div>
+            <h2>演示工作台：一次真实仓库维护运行</h2>
+            <p>以下展示一个样例仓库的运行结果：AI 先完成全仓理解，再生成修复计划，最后提交一个针对报表筛选模块的可审查补丁。</p>
+          </div>
+          <span class="pill"><span class="dot"></span> Run completed · 28m 14s</span>
+        </div>
+        <div class="workspace">
+          <aside class="sidebar">
+            <div class="repo-picker">
+              <strong>northstar-dashboard</strong>
+              <span>github.com/acme/northstar-dashboard</span>
+            </div>
+            <div class="sidebar-title">Workspace</div>
+            <a class="side-item active" href="#workspace">⌁ Repository report</a>
+            <a class="side-item" href="#timeline">◌ Agent timeline</a>
+            <a class="side-item" href="#review">▣ Pull request review</a>
+            <a class="side-item" href="#benchmark">◇ Benchmark</a>
+            <div class="sidebar-title">Current objective</div>
+            <div class="repo-picker">
+              <strong>Stabilize report filters</strong>
+              <span>Extract filter schema, fix export regression, add tests</span>
+            </div>
+          </aside>
+          <div class="main-panel">
+            <div class="panel-top">
+              <div class="panel-title">
+                <h3>Repository Health Report</h3>
+                <p>Generated from source files, test logs and package graph.</p>
+              </div>
+              <span class="status-badge"><span class="dot"></span> Ready for review</span>
+            </div>
+            <div class="metric-row">
+              <div class="metric"><span>Architecture score</span><strong>72</strong><em>+11 after plan</em></div>
+              <div class="metric"><span>Risk hotspots</span><strong>6</strong><em>3 actionable</em></div>
+              <div class="metric"><span>Test coverage</span><strong>41%</strong><em>target 58%</em></div>
+              <div class="metric"><span>Estimated saved time</span><strong>9.5h</strong><em>per task</em></div>
+            </div>
+            <div class="split">
+              <div class="panel-box">
+                <h4>High-impact files</h4>
+                <table class="table">
+                  <thead><tr><th>File</th><th>Reason</th><th>Risk</th></tr></thead>
+                  <tbody>
+                    <tr><td><code>src/modules/reporting/useLegacyFilters.ts</code></td><td>UI state and query serialization coupled</td><td class="risk-high">High</td></tr>
+                    <tr><td><code>src/api/exportReport.ts</code></td><td>Missing validation for date range exports</td><td class="risk-high">High</td></tr>
+                    <tr><td><code>src/components/FilterPanel.tsx</code></td><td>Large component with 5 mixed responsibilities</td><td class="risk-mid">Medium</td></tr>
+                    <tr><td><code>tests/reporting/export.test.ts</code></td><td>Regression scenarios missing</td><td class="risk-mid">Medium</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="panel-box">
+                <h4>Module map</h4>
+                <div class="module-map">
+                  <div class="module"><b>/src/modules/reporting</b><span class="bar"><i style="width:84%"></i></span></div>
+                  <div class="module"><b>/src/api</b><span class="bar"><i style="width:68%"></i></span></div>
+                  <div class="module"><b>/src/components</b><span class="bar"><i style="width:62%"></i></span></div>
+                  <div class="module"><b>/src/state</b><span class="bar"><i style="width:43%"></i></span></div>
+                  <div class="module"><b>/tests/reporting</b><span class="bar"><i style="width:36%"></i></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="timeline">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <div class="kicker">Agent timeline</div>
+            <h2>可追踪的多 Agent 执行链路</h2>
+            <p>每个 Agent 都有明确输入、输出和校验标准，避免把复杂任务变成不可解释的一次性生成。</p>
+          </div>
+        </div>
+        <div class="timeline">
+          <div class="step"><div class="step-num">1</div><div><h4>Repository Architect Agent</h4><p>读取 package graph、路由、组件树、服务层和测试日志，识别报表模块存在循环依赖、过滤器状态耦合和导出回归风险。</p></div><small>06:12</small></div>
+          <div class="step"><div class="step-num">2</div><div><h4>Planning Agent</h4><p>将目标拆分为 5 个任务：抽离 filter schema、修复日期序列化、补充 export regression tests、拆分 FilterPanel、更新开发文档。</p></div><small>04:38</small></div>
+          <div class="step"><div class="step-num">3</div><div><h4>Coding Agent</h4><p>生成 7 个文件的 patch，新增 filterSchema.ts 与 12 个测试用例，并将 UI 状态与请求参数序列化逻辑解耦。</p></div><small>11:41</small></div>
+          <div class="step"><div class="step-num">4</div><div><h4>Tester Agent</h4><p>执行 lint、typecheck 和 reporting test suite；首次运行发现 2 个边界日期失败，随后完成修复并全部通过。</p></div><small>03:56</small></div>
+          <div class="step"><div class="step-num">5</div><div><h4>Review Agent</h4><p>检查破坏性变更、异常处理和测试覆盖，生成 PR 摘要、风险说明和回滚路径，标记为“可人工审查”。</p></div><small>01:47</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="review">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <div class="kicker">Pull request output</div>
+            <h2>PR 级结果，而不是一段零散代码</h2>
+            <p>RepoOrbit 的最终输出可以直接作为开发者审查材料：包含变更摘要、核心 diff、测试状态、风险评估和下一步建议。</p>
+          </div>
+        </div>
+        <div class="diff-layout">
+          <div class="diff-file">
+            <div class="diff-head"><span>src/modules/reporting/filterSchema.ts</span><span>new file</span></div>
+            <pre><span class="line-add">+ export type ReportFilter = {</span>
+<span class="line-add">+   range: { from: string; to: string };</span>
+<span class="line-add">+   segment?: 'all' | 'enterprise' | 'self-serve';</span>
+<span class="line-add">+   status?: 'open' | 'closed' | 'pending';</span>
+<span class="line-add">+ };</span>
+
+<span class="line-add">+ export function serializeReportFilter(filter: ReportFilter) {</span>
+<span class="line-add">+   const params = new URLSearchParams();</span>
+<span class="line-add">+   params.set('from', normalizeDate(filter.range.from));</span>
+<span class="line-add">+   params.set('to', normalizeDate(filter.range.to));</span>
+<span class="line-add">+   if (filter.segment && filter.segment !== 'all') params.set('segment', filter.segment);</span>
+<span class="line-add">+   if (filter.status) params.set('status', filter.status);</span>
+<span class="line-add">+   return params.toString();</span>
+<span class="line-add">+ }</span>
+
+<span class="line-del">- // legacy serializer removed from useLegacyFilters.ts</span></pre>
+          </div>
+          <aside>
+            <div class="review-card">
+              <h4>Review summary</h4>
+              <p>本次变更把报表过滤器序列化逻辑从 UI hook 中抽出，降低组件耦合，同时补充导出场景的回归测试。</p>
+              <div class="checklist">
+                <div class="check">12 个新增测试全部通过</div>
+                <div class="check">typecheck 无错误</div>
+                <div class="check">导出服务参数格式保持向后兼容</div>
+              </div>
+            </div>
+            <div class="review-card">
+              <h4>Risk notes</h4>
+              <p>低风险。主要风险来自日期边界序列化，已通过 UTC 与本地日期测试覆盖。建议上线后观察 export failure rate。</p>
+            </div>
+            <div class="review-card">
+              <h4>Next tasks</h4>
+              <p>继续拆分 FilterPanel，将 preset、segment selector 和 status selector 提取为独立组件，并补充交互测试。</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section id="benchmark">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <div class="kicker">Evaluation plan</div>
+            <h2>用真实仓库任务评测 AI Coding 效果</h2>
+            <p>RepoOrbit 会持续收集不同技术栈的维护任务，比较 AI 在仓库理解、补丁正确率、测试修复和审查质量上的表现。</p>
+          </div>
+        </div>
+        <div class="benchmark">
+          <div class="score-card"><strong>30</strong><span>计划纳入的开源与样例仓库，覆盖 React、Next.js、Node.js、Python CLI 与工具库。</span><div class="spark"><svg viewBox="0 0 300 78"><path d="M0,58 C38,54 50,40 82,42 C122,44 126,22 166,26 C204,31 214,12 250,16 C276,19 286,10 300,8" fill="none" stroke="rgba(87,185,255,.95)" stroke-width="4"/></svg></div></div>
+          <div class="score-card"><strong>200+</strong><span>真实维护任务，包括依赖升级、测试补齐、Bug 修复、组件拆分、接口类型补全和文档更新。</span><div class="spark"><svg viewBox="0 0 300 78"><path d="M0,64 C30,50 52,60 76,44 C104,25 130,48 160,32 C198,12 212,28 238,18 C270,8 284,18 300,11" fill="none" stroke="rgba(46,233,166,.95)" stroke-width="4"/></svg></div></div>
+          <div class="score-card"><strong>5-8</strong><span>每个复杂任务的典型 Agent 回合：理解、规划、编码、测试、修复、复审、报告。</span><div class="spark"><svg viewBox="0 0 300 78"><path d="M0,60 L34,60 L34,50 L72,50 L72,38 L110,38 L110,30 L158,30 L158,20 L218,20 L218,12 L300,12" fill="none" stroke="rgba(124,92,255,.95)" stroke-width="4"/></svg></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <div class="kicker">Roadmap</div>
+            <h2>从演示原型到可复用开发工作流</h2>
+            <p>后续版本会把仓库接入、运行日志、评测数据和 PR 报告进一步产品化，让团队可以持续复用同一套 AI 维护流程。</p>
+          </div>
+        </div>
+        <div class="roadmap">
+          <article class="card"><span class="tag">Phase 1</span><h3>静态仓库分析</h3><p>支持上传仓库结构和关键文件，生成 repo map、风险清单和技术债 backlog。</p></article>
+          <article class="card"><span class="tag">Phase 2</span><h3>工具链接入</h3><p>接入本地 AI 编程工具，保留每轮命令、输出、失败原因和修复记录。</p></article>
+          <article class="card"><span class="tag">Phase 3</span><h3>自动评测集</h3><p>构建多仓库 benchmark，统计任务成功率、测试通过率和人工节省时间。</p></article>
+          <article class="card"><span class="tag">Phase 4</span><h3>团队协作</h3><p>支持任务模板、审查规则、PR 报告导出和历史运行对比。</p></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div><strong>RepoOrbit</strong><br><span>AI repository maintenance cockpit for complex codebases.</span></div>
+      <div>Demo build · v0.2 · Static prototype</div>
+    </div>
+  </footer>
+
+  <div class="floating-note"><span class="dot"></span> Demo data loaded · northstar-dashboard</div>
+
+  <script>
+    const note = document.querySelector('.floating-note');
+    let hidden = false;
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 500 && !hidden) {
+        note.style.opacity = '0';
+        note.style.transform = 'translateY(16px)';
+        note.style.transition = 'all .28s ease';
+        hidden = true;
+      }
+    });
+  </script>
+</body>
+</html>
